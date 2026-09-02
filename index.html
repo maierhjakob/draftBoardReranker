@@ -116,7 +116,7 @@
   }
 
   .head{
-    display:grid; grid-template-columns:66px 1fr 52px 54px 62px;
+    display:grid; grid-template-columns:66px 46px 1fr 52px 54px 62px;
     gap:10px; align-items:end; padding:18px 12px 6px;
     font:600 10px/1 "Barlow Condensed",Arial,sans-serif; letter-spacing:.14em;
     text-transform:uppercase; color:var(--faint);
@@ -124,7 +124,7 @@
   .head .r{text-align:right}
   ol.board{list-style:none; margin:0; padding:0}
   li.row{
-    display:grid; grid-template-columns:66px 1fr 52px 54px 62px;
+    display:grid; grid-template-columns:66px 46px 1fr 52px 54px 62px;
     gap:10px; align-items:center;
     padding:5px 12px; border-top:1px solid var(--line);
   }
@@ -149,6 +149,11 @@
   }
   .pos.QB{background:var(--qb)} .pos.RB{background:var(--rb)} .pos.WR{background:var(--wr)}
   .pos.TE{background:var(--te)} .pos.K{background:var(--k)} .pos.DST{background:var(--dst)}
+  .slot{
+    font-family:"IBM Plex Mono",monospace; font-size:12.5px; font-variant-numeric:tabular-nums;
+    color:var(--muted); text-align:center; letter-spacing:-.01em;
+  }
+  .slot b{color:var(--ink); font-weight:600}
   .team{font-family:"IBM Plex Mono",monospace; font-size:12.5px; color:var(--muted); text-align:center}
   .nudge{display:flex; gap:3px; justify-content:flex-end}
   .nudge button{
@@ -190,8 +195,9 @@
     border-radius:7px; padding:9px; resize:vertical;
   }
   @media (max-width:640px){
-    .head,li.row{grid-template-columns:58px 1fr 46px 46px}
+    .head,li.row{grid-template-columns:52px 42px 1fr 44px 44px}
     .nudge,.head .r{display:none}
+    .team{font-size:11.5px}
     h1{font-size:30px}
   }
 </style>
@@ -217,7 +223,7 @@
         <span>Find player</span>
         <input type="text" id="find" placeholder="Chase, ATL, RB" autocomplete="off">
       </label>
-      <label class="fld">
+      <label class="fld" title="League size — sets the round dividers and the round.pick slot column">
         <span>Teams</span>
         <input type="number" id="teams" min="0" max="32" step="1" value="12">
       </label>
@@ -239,12 +245,13 @@
   <div class="meta" id="meta"></div>
 
   <div class="head">
-    <div>Rank</div><div>Player</div><div>Pos</div><div>Team</div><div class="r">Nudge</div>
+    <div>Rank</div><div>Slot</div><div>Player</div><div>Pos</div><div>Team</div><div class="r">Nudge</div>
   </div>
   <ol class="board" id="board-list"></ol>
 
   <div class="foot">
     <p><b>The move:</b> typing <kbd>1</kbd> next to a player sitting at 40 lifts them to the top and pushes ranks 1&ndash;39 down one each. <kbd>Enter</kbd> commits, <kbd>Esc</kbd> cancels, <kbd>&uarr;</kbd><kbd>&darr;</kbd> nudge a single slot.</p>
+    <p><b>Slot</b> is the <code>round.pick</code> position at your league size &mdash; <code>2.1</code> is the first pick of round two. Change <b>Teams</b> and the whole board re-slots.</p>
     <p><b>Upload CSV</b> takes your own board &mdash; drag a file onto the page or use the button. It reads either <code>firstName</code> + <code>lastName</code> + <code>slotName</code> (Underdog) or a <code>Player</code> column (FantasyPros, and this tool's own export), ordering by <code>ADP</code> or <code>Rank</code> when one is present. <code>Pos</code> and <code>Team</code> are optional.</p>
     <p id="foot-src"></p>
   </div>
@@ -589,6 +596,17 @@ function render(){
     input.setAttribute("aria-label", "Rank for " + p.name + ", currently " + rank);
     cell.appendChild(input);
 
+    const slot = document.createElement("div");
+    slot.className = "slot";
+    if (teams > 0){
+      const rd = Math.floor(i / teams) + 1, pk = (i % teams) + 1;
+      slot.innerHTML = "<b>" + rd + "</b>." + pk;
+      slot.title = "Round " + rd + ", pick " + pk;
+    } else {
+      slot.textContent = "\u2013";
+      slot.title = "Set a team count to see draft slots";
+    }
+
     const name = document.createElement("div");
     name.className = "name";
     name.textContent = p.name;
@@ -615,7 +633,7 @@ function render(){
     down.addEventListener("click", () => moveTo(p.name, rank + 1));
     nudge.append(up, down);
 
-    li.append(cell, name, pos, team, nudge);
+    li.append(cell, slot, name, pos, team, nudge);
     frag.appendChild(li);
   });
 

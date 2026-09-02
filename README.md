@@ -2,6 +2,8 @@
 
 A single-file tool for reordering fantasy football ranking boards by typing ranks, then exporting a CSV that [FantasySage](https://fantasy-sage-football.vercel.app/) will actually accept in its upload slot.
 
+Every row also carries its draft slot in `round.pick` notation at your league size — at 12 teams, rank 13 is `2.1`, the first pick of round two.
+
 Type a player's new rank, press <kbd>Enter</kbd>, and they move there — everyone in between shifts one slot and the board renumbers. Moving a player from 40 to 1 pushes ranks 1–39 down one each; nothing else reorders.
 
 ## Use it
@@ -17,7 +19,7 @@ It also runs as a claude.ai Artifact, where the browser sandbox blocks page-init
 | Rank box | Type a number, <kbd>Enter</kbd> to commit, <kbd>Esc</kbd> to cancel |
 | <kbd>↑</kbd> / <kbd>↓</kbd> | Nudge one slot, keeping focus for repeats |
 | Find player | Filter by name, team, or position — ranks stay global while filtered |
-| Teams | League size, for the round dividers (default 12) |
+| Teams | League size, driving the `round.pick` slot column and the round dividers (default 12) |
 | Undo / Redo | Also <kbd>Cmd/Ctrl+Z</kbd> and <kbd>Cmd/Ctrl+Shift+Z</kbd> |
 | Upload CSV | Load your own board — or drop a CSV anywhere on the page |
 | Copy CSV / Download CSV | Export the current order |
