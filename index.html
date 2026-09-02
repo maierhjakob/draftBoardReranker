@@ -227,7 +227,6 @@
       <span class="spacer"></span>
       <button class="btn" id="undo" type="button" title="Cmd/Ctrl+Z">Undo</button>
       <button class="btn" id="redo" type="button" title="Cmd/Ctrl+Shift+Z">Redo</button>
-      <button class="btn" id="reset" type="button">Reset</button>
       <button class="btn" id="drop" type="button" hidden>Remove upload</button>
       <button class="btn" id="upload" type="button">Upload CSV</button>
       <input type="file" id="file" accept=".csv,text/csv" hidden>
@@ -549,7 +548,6 @@ function render(){
 
   $("#undo").disabled = !undoStack.length;
   $("#redo").disabled = !redoStack.length;
-  $("#reset").disabled = !edited;
   $("#drop").hidden = !b.uploaded;
 
   const term = $("#find").value.trim().toLowerCase();
@@ -703,11 +701,6 @@ $("#redo").addEventListener("click", () => {
   applyOrder(redoStack.pop());
   say("Redid one move.");
 });
-$("#reset").addEventListener("click", () => {
-  if (!isEdited()) return;
-  commit(decode(board()), "Board reset to its published order.");
-});
-
 addEventListener("keydown", e => {
   if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z") return;
   if (e.target.closest && e.target.closest(".rankbox")) return;

@@ -19,7 +19,6 @@ It also runs as a claude.ai Artifact, where the browser sandbox blocks page-init
 | Find player | Filter by name, team, or position — ranks stay global while filtered |
 | Teams | League size, for the round dividers (default 12) |
 | Undo / Redo | Also <kbd>Cmd/Ctrl+Z</kbd> and <kbd>Cmd/Ctrl+Shift+Z</kbd> |
-| Reset | Back to the board's published order |
 | Upload CSV | Load your own board — or drop a CSV anywhere on the page |
 | Copy CSV / Download CSV | Export the current order |
 
