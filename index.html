@@ -13,7 +13,7 @@
     --ink:#14201E; --muted:#5A6B67; --faint:#8A9895;
     --line:#D5DCDA; --line-strong:#BCC6C3;
     --accent:#0F6E63; --accent-ink:#FFFFFF; --accent-wash:#0F6E6314;
-    --pos-ink:#FFFFFF;
+    --pos-ink:#FFFFFF; --pos-other:#6E7E7A;
     --qb:#7A4E9B; --rb:#26794E; --wr:#245F9E; --te:#A96812; --k:#5F6E6B; --dst:#8A3E4A;
     --flash:#0F6E6326;
     --shadow:0 1px 2px rgba(20,32,30,.06), 0 8px 24px rgba(20,32,30,.07);
@@ -24,7 +24,7 @@
       --ink:#E7EDEB; --muted:#9AAAA6; --faint:#6E7E7A;
       --line:#2B3936; --line-strong:#3C4C48;
       --accent:#45BFB0; --accent-ink:#07211E; --accent-wash:#45BFB01F;
-      --pos-ink:#0E1614;
+      --pos-ink:#0E1614; --pos-other:#8A9895;
       --qb:#B48ACF; --rb:#5FB585; --wr:#6EA3DA; --te:#D9A34E; --k:#93A29E; --dst:#CE8390;
       --flash:#45BFB033;
       --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.28);
@@ -35,7 +35,7 @@
     --ink:#E7EDEB; --muted:#9AAAA6; --faint:#6E7E7A;
     --line:#2B3936; --line-strong:#3C4C48;
     --accent:#45BFB0; --accent-ink:#07211E; --accent-wash:#45BFB01F;
-    --pos-ink:#0E1614;
+    --pos-ink:#0E1614; --pos-other:#8A9895;
     --qb:#B48ACF; --rb:#5FB585; --wr:#6EA3DA; --te:#D9A34E; --k:#93A29E; --dst:#CE8390;
     --flash:#45BFB033;
     --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.28);
@@ -144,7 +144,8 @@
   .name{font-weight:600; min-width:0; overflow-wrap:anywhere}
   .pos{
     font:600 11px/1 "Barlow Condensed",Arial,sans-serif; letter-spacing:.08em;
-    text-align:center; padding:5px 0; border-radius:5px; color:var(--pos-ink);
+    text-align:center; padding:5px 0; border-radius:5px;
+    color:var(--pos-ink); background:var(--pos-other);
   }
   .pos.QB{background:var(--qb)} .pos.RB{background:var(--rb)} .pos.WR{background:var(--wr)}
   .pos.TE{background:var(--te)} .pos.K{background:var(--k)} .pos.DST{background:var(--dst)}
@@ -177,6 +178,7 @@
     font-family:"IBM Plex Mono",monospace; font-size:11px; background:var(--surface-2);
     border:1px solid var(--line-strong); border-radius:4px; padding:1px 5px; color:var(--ink);
   }
+  code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--ink)}
   .sheet{
     position:fixed; inset:auto 0 0 0; z-index:40; background:var(--surface);
     border-top:1px solid var(--line-strong); box-shadow:var(--shadow); padding:14px 16px;
@@ -226,6 +228,9 @@
       <button class="btn" id="undo" type="button" title="Cmd/Ctrl+Z">Undo</button>
       <button class="btn" id="redo" type="button" title="Cmd/Ctrl+Shift+Z">Redo</button>
       <button class="btn" id="reset" type="button">Reset</button>
+      <button class="btn" id="drop" type="button" hidden>Remove upload</button>
+      <button class="btn" id="upload" type="button">Upload CSV</button>
+      <input type="file" id="file" accept=".csv,text/csv" hidden>
       <button class="btn" id="copy" type="button">Copy CSV</button>
       <button class="btn primary" id="save" type="button">Download CSV</button>
     </div>
@@ -241,6 +246,7 @@
 
   <div class="foot">
     <p><b>The move:</b> typing <kbd>1</kbd> next to a player sitting at 40 lifts them to the top and pushes ranks 1&ndash;39 down one each. <kbd>Enter</kbd> commits, <kbd>Esc</kbd> cancels, <kbd>&uarr;</kbd><kbd>&darr;</kbd> nudge a single slot.</p>
+    <p><b>Upload CSV</b> takes your own board &mdash; drag a file onto the page or use the button. It reads either <code>firstName</code> + <code>lastName</code> + <code>slotName</code> (Underdog) or a <code>Player</code> column (FantasyPros, and this tool's own export), ordering by <code>ADP</code> or <code>Rank</code> when one is present. <code>Pos</code> and <code>Team</code> are optional.</p>
     <p id="foot-src"></p>
   </div>
 </div>
@@ -261,14 +267,17 @@ const BOARDS = [{"id":"hybrid-half-ppr","label":"Sage Rankings","format":"Half P
 const POS = ["QB","RB","WR","TE","K","DST"];
 const $ = s => document.querySelector(s);
 
+let userBoards = [];
 let boardId = BOARDS[0].id;
 let rows = [];
 let undoStack = [], redoStack = [];
 let posFilter = "ALL";
 let flashName = null, refocusName = null, moving = false;
 
-const board = () => BOARDS.find(b => b.id === boardId);
+const allBoards = () => BOARDS.concat(userBoards);
+const board = () => allBoards().find(b => b.id === boardId) || BOARDS[0];
 const storeKey = id => "reranker:" + id;
+const UPLOAD_KEY = "reranker:uploads";
 const names = () => rows.map(p => p.name);
 
 function decode(b){
@@ -347,6 +356,168 @@ function toCSV(){
 }
 const filename = () => board().id + (isEdited() ? "-custom" : "") + ".csv";
 
+/* ---------- csv import ---------- */
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+const sane = s => String(s == null ? "" : s).replace(/\|/g, "/").trim();
+const cleanPos = v => sane(v).replace(/\d/g, "").toUpperCase();
+
+function parseCSV(text){
+  text = text.replace(/^\uFEFF/, "");
+  const out = [];
+  let field = "", row = [], inQ = false;
+  const endRow = () => {
+    row.push(field); field = "";
+    if (row.some(v => v.trim() !== "")) out.push(row);
+    row = [];
+  };
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (inQ){
+      if (c === '"'){
+        if (text[i + 1] === '"'){ field += '"'; i++; }
+        else inQ = false;
+      } else field += c;
+    }
+    else if (c === '"') inQ = true;
+    else if (c === ",") { row.push(field); field = ""; }
+    else if (c === "\n") endRow();
+    else if (c === "\r"){ if (text[i + 1] === "\n") i++; endRow(); }
+    else field += c;
+  }
+  endRow();
+  return out;
+}
+
+function pickCol(head, cands){
+  const lower = head.map(x => x.toLowerCase().trim());
+  for (const c of cands){
+    const i = lower.indexOf(c.toLowerCase());
+    if (i >= 0) return i;
+  }
+  return -1;
+}
+
+// Accepts the two shapes FantasySage itself reads, plus this tool's own export.
+function boardFromCSV(text, fname){
+  const table = parseCSV(text);
+  if (table.length < 2) throw new Error("That file has a header but no data rows.");
+  const head = table[0], body = table.slice(1);
+
+  const iFirst = pickCol(head, ["firstName", "first_name", "first name"]);
+  const iLast  = pickCol(head, ["lastName", "last_name", "last name"]);
+  const iSlot  = pickCol(head, ["slotName", "slot_name", "slot name", "slot"]);
+  const iPlayer = pickCol(head, ["Player", "Player Name", "name", "full name"]);
+  const iPos = pickCol(head, ["Pos", "Position"]);
+
+  let read, iRank, shape;
+  if (iFirst >= 0 && iLast >= 0 && iSlot >= 0){
+    shape = "Underdog";
+    const iTeam = pickCol(head, ["teamName", "team_name", "team name", "team"]);
+    iRank = pickCol(head, ["adp", "rank", "rk", "overall"]);
+    read = r => {
+      const n = (sane(r[iFirst]) + " " + sane(r[iLast])).trim();
+      return n ? { name: n, pos: cleanPos(r[iSlot]), team: (iTeam >= 0 && sane(r[iTeam])) || "FA" } : null;
+    };
+  } else if (iPlayer >= 0){
+    shape = "FantasyPros";
+    const iTeam = pickCol(head, ["Team", "teamName", "team_name"]);
+    const adpOn = head.findIndex(x => x.toLowerCase().trim().startsWith("adp on "));
+    iRank = adpOn >= 0 ? adpOn : pickCol(head, ["ADP", "Rank", "Rk", "overall"]);
+    read = r => {
+      const n = sane(r[iPlayer]);
+      return n ? { name: n, pos: iPos >= 0 ? cleanPos(r[iPos]) : "", team: (iTeam >= 0 && sane(r[iTeam])) || "FA" } : null;
+    };
+  } else {
+    throw new Error("No player column found. Needs firstName + lastName + slotName, or a Player column.");
+  }
+
+  const seen = new Set();
+  const picked = [];
+  let dupes = 0;
+  body.forEach(r => {
+    const p = read(r);
+    if (!p) return;
+    const k = p.name.toLowerCase().replace(/[^a-z]/g, "");
+    if (!k) return;
+    if (seen.has(k)){ dupes++; return; }
+    seen.add(k);
+    const n = iRank >= 0 ? parseFloat(sane(r[iRank]).replace(/[^0-9.\-]/g, "")) : NaN;
+    picked.push({ p, ord: Number.isFinite(n) ? n : Infinity });
+  });
+  if (!picked.length) throw new Error("Found the columns but no usable player rows.");
+
+  if (picked.some(x => x.ord !== Infinity)){
+    picked.forEach((x, i) => { if (x.ord === Infinity) x.ord = 1e9 + i; });
+    picked.sort((a, b) => a.ord - b.ord);
+  }
+
+  const stem = fname.replace(/\.csv$/i, "").slice(0, 48) || "Uploaded board";
+  const slug = stem.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "upload";
+  return {
+    board: {
+      id: "up:" + slug,
+      label: stem,
+      format: "Uploaded",
+      source: fname,
+      updated: new Date().toLocaleDateString(),
+      uploaded: true,
+      p: picked.map(x => x.p.name + "|" + x.p.pos + "|" + x.p.team)
+    },
+    shape, dupes, ordered: iRank >= 0
+  };
+}
+
+function saveUploads(){
+  try { localStorage.setItem(UPLOAD_KEY, JSON.stringify(userBoards)); return true; }
+  catch (e){ return false; }
+}
+function loadUploads(){
+  try {
+    const raw = JSON.parse(localStorage.getItem(UPLOAD_KEY) || "[]");
+    if (Array.isArray(raw)) userBoards = raw.filter(b => b && b.id && Array.isArray(b.p) && b.p.length);
+  } catch (e){ userBoards = []; }
+}
+
+function refreshBoardSelect(){
+  const opt = b => '<option value="' + esc(b.id) + '">' + esc(b.label) + " \u2014 " + esc(b.format) + " (" + b.p.length + ")</option>";
+  let html = '<optgroup label="Built-in boards">' + BOARDS.map(opt).join("") + "</optgroup>";
+  if (userBoards.length) html += '<optgroup label="Your uploads">' + userBoards.map(opt).join("") + "</optgroup>";
+  $("#board").innerHTML = html;
+  $("#board").value = boardId;
+}
+
+function ingest(text, fname){
+  let res;
+  try { res = boardFromCSV(text, fname); }
+  catch (err){ say(err.message, true); return; }
+
+  userBoards = userBoards.filter(b => b.id !== res.board.id);
+  userBoards.push(res.board);
+  const remembered = saveUploads();
+  boardId = res.board.id;
+  refreshBoardSelect();
+  load();
+  render();
+
+  const bits = ["Loaded " + res.board.p.length + " players from " + fname + " (" + res.shape + " columns)"];
+  if (res.dupes) bits.push(res.dupes + " duplicate name" + (res.dupes === 1 ? "" : "s") + " dropped");
+  if (!res.ordered) bits.push("no rank column, so file order was kept");
+  if (!remembered) bits.push("too large to remember for next visit");
+  say(bits.join(" \u00b7 ") + ".");
+}
+
+function takeFile(f){
+  if (!f) return;
+  if (!/\.csv$/i.test(f.name) && f.type && !/csv|text/i.test(f.type)){
+    say("That doesn't look like a CSV file.", true);
+    return;
+  }
+  const rd = new FileReader();
+  rd.onerror = () => say("Couldn't read that file.", true);
+  rd.onload = () => ingest(String(rd.result), f.name);
+  rd.readAsText(f);
+}
+
 /* ---------- render ---------- */
 function say(msg, warn){
   const el = $("#status");
@@ -367,16 +538,19 @@ function render(){
     meta.appendChild(s);
   };
   add("<b>" + rows.length + "</b> players");
-  add(b.format);
-  add(b.source + " · updated " + b.updated);
+  add(esc(b.format));
+  add(esc(b.source) + " · " + (b.uploaded ? "uploaded" : "updated") + " " + esc(b.updated));
   if (edited) add("Edited", "badge");
 
-  $("#foot-src").innerHTML = "<b>" + b.label + "</b> — " + b.source +
-    ". Pulled from the FantasySage bundle; your edits stay in this browser until you export.";
+  $("#foot-src").innerHTML = b.uploaded
+    ? "<b>" + esc(b.label) + "</b> — your uploaded file. It stays in this browser; nothing is sent anywhere."
+    : "<b>" + esc(b.label) + "</b> — " + esc(b.source) +
+      ". Pulled from the FantasySage bundle; your edits stay in this browser until you export.";
 
   $("#undo").disabled = !undoStack.length;
   $("#redo").disabled = !redoStack.length;
   $("#reset").disabled = !edited;
+  $("#drop").hidden = !b.uploaded;
 
   const term = $("#find").value.trim().toLowerCase();
   const teams = Math.max(0, Math.min(32, parseInt($("#teams").value, 10) || 0));
@@ -556,6 +730,34 @@ $("#copy").addEventListener("click", async () => {
 });
 $("#sheet-close").addEventListener("click", () => { $("#sheet").hidden = true; });
 
+$("#upload").addEventListener("click", () => $("#file").click());
+$("#file").addEventListener("change", e => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = "";
+  takeFile(f);
+});
+$("#drop").addEventListener("click", () => {
+  const b = board();
+  if (!b.uploaded) return;
+  userBoards = userBoards.filter(x => x.id !== b.id);
+  saveUploads();
+  try { localStorage.removeItem(storeKey(b.id)); } catch (e){ /* ignore */ }
+  boardId = BOARDS[0].id;
+  refreshBoardSelect();
+  load();
+  render();
+  say("Removed that upload.");
+});
+
+// drop a CSV anywhere on the page
+addEventListener("dragover", e => { e.preventDefault(); document.body.style.opacity = ".93"; });
+addEventListener("dragleave", () => { document.body.style.opacity = ""; });
+addEventListener("drop", e => {
+  e.preventDefault();
+  document.body.style.opacity = "";
+  takeFile(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+});
+
 let downloads = null;   // set when running inside a claude.ai Artifact
 
 function nativeSave(name, text){
@@ -600,9 +802,8 @@ $("#themer").addEventListener("click", () => {
 });
 
 /* ---------- boot ---------- */
-$("#board").innerHTML = BOARDS.map(b =>
-  '<option value="' + b.id + '">' + b.label + " — " + b.format + " (" + b.p.length + ")</option>"
-).join("");
+loadUploads();
+refreshBoardSelect();
 
 $("#chips").innerHTML = ["ALL"].concat(POS).map(p =>
   '<button class="chip" type="button" data-pos="' + p + '" aria-pressed="' + (p === "ALL") + '">' +

@@ -20,9 +20,21 @@ It also runs as a claude.ai Artifact, where the browser sandbox blocks page-init
 | Teams | League size, for the round dividers (default 12) |
 | Undo / Redo | Also <kbd>Cmd/Ctrl+Z</kbd> and <kbd>Cmd/Ctrl+Shift+Z</kbd> |
 | Reset | Back to the board's published order |
+| Upload CSV | Load your own board — or drop a CSV anywhere on the page |
 | Copy CSV / Download CSV | Export the current order |
 
 Edits persist per board in `localStorage`, so you can close the tab mid-rerank. They only reach FantasySage when you export and upload.
+
+## Import format
+
+Upload reads the same two column shapes FantasySage does, plus this tool's own export:
+
+- **Underdog** — `firstName` + `lastName` + `slotName`, optionally `teamName` and `adp`
+- **FantasyPros** — a `Player` column (or `name`), optionally `Pos`/`Position`, `Team`, and `Rank`/`ADP`/`ADP on <date>`
+
+Rows are ordered by the rank column when there is one, otherwise file order is kept. Quoted fields, CRLF endings, and a UTF-8 BOM are all handled; duplicate player names are dropped, keeping the first. Digits are stripped from positions, so Underdog's `WR1` reads as `WR`.
+
+Uploaded boards join the dropdown under **Your uploads** and are remembered in `localStorage`; **Remove upload** discards one. Parsing happens entirely in the page — no file is ever uploaded anywhere.
 
 ## Export format
 
